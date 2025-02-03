@@ -3,10 +3,8 @@ services:
     name: Alien App
     env: python
     plan: free
-    buildCommand:
-      - pip install -r requirements.txt
-    startCommand:
-      - python main.py
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python main.py"
     envVars:
       - key: BOT_TOKEN
         value: 7827267917:AAExshTZTAjoytIjzF8-5zjnrmX4WbS6fzk
