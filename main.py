@@ -10,6 +10,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from dotenv import load_dotenv
 from pymongo import MongoClient
+import nest_asyncio
+nest_asyncio.apply()
 
 # Configure logging
 logging.basicConfig(
@@ -126,4 +128,4 @@ async def run_telegram():
 # Start both Flask and Telegram bot
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
-    asyncio.run(run_telegram())  # ✅ Uses asyncio.run to avoid loop conflicts
+    asyncio.run(run_telegram())  # Works properly with `nest_asyncio`
