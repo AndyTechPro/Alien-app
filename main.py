@@ -126,5 +126,4 @@ async def run_telegram():
 # Start both Flask and Telegram bot
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_telegram())
+    asyncio.run(run_telegram())  # ✅ Uses asyncio.run to avoid loop conflicts
