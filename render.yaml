@@ -1,13 +1,12 @@
 services:
   - type: web
-    name: Alien App
+    name: telegram-bot
     env: python
     plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python main.py"
     envVars:
       - key: BOT_TOKEN
-        value: 7827267917:AAExshTZTAjoytIjzF8-5zjnrmX4WbS6fzk
+        sync: false
       - key: MONGO_URI
-        value: mongodb+srv://schoolzealsup:mongoPrush1@cluster0.dtmp8.mongodb.net/<dbname>?retryWrites=true&w=majority
-    autoDeploy: true
+        sync: false
