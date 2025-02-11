@@ -11,6 +11,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import nest_asyncio
+
 nest_asyncio.apply()
 
 # Configure logging
@@ -24,9 +25,11 @@ logger = logging.getLogger(__name__)
 # Flask app
 app = Flask(__name__)
 
+
 @app.route('/')
 def home():
-    return "Telegram Bot with Flask is Running!".encode("utf-8")  # ✅ FIXED ENCODING ISSUE
+    return "Telegram Bot with Flask is Running!".encode("utf-8")
+
 
 # Load environment variables
 load_dotenv()
@@ -40,6 +43,8 @@ user_collection = db["users"]
 
 # Constants
 REFERRAL_POINTS = 20  # Points awarded to the referrer
+WELCOME_IMAGE_PATH = "preview.jpg"  # Ensure this file exists in your project folder
+WELCOME_IMAGE_URL = "https://example.com/your-image.jpg"  # Alternative (use direct image URL if needed)
 WELCOME_MESSAGE = (
     "👋 Welcome to Alien Enigma Bot!\n\n"
     "Earn points by joining the Daily Lucky Draw, Fighting Aliens, and inviting friends.\n\n"
@@ -49,10 +54,12 @@ WELCOME_MESSAGE = (
     "Click the button below to claim your daily points!"
 )
 
+
 # Format time into 'Hh Mm' format
 def format_time(seconds):
     remaining_time = timedelta(seconds=int(seconds))
     return f"{remaining_time.seconds // 3600}h {remaining_time.seconds % 3600 // 60}m"
+
 
 # Start command
 async def start(update: Update, context):
@@ -71,7 +78,6 @@ async def start(update: Update, context):
         if referrer_data:
             user_collection.update_one({"user_id": referred_by}, {"$inc": {"points": REFERRAL_POINTS}})
             user_collection.update_one({"user_id": user_id}, {"$set": {"referred_by": referred_by}})
-
             await context.bot.send_message(
                 chat_id=referred_by,
                 text=f"🎉 You earned {REFERRAL_POINTS} points for referring {update.effective_user.first_name}!"
@@ -80,7 +86,20 @@ async def start(update: Update, context):
     keyboard = [[InlineKeyboardButton("🎁 Claim Daily Points", callback_data="claim_points")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(WELCOME_MESSAGE, reply_markup=reply_markup)
+    try:
+        await update.message.reply_photo(
+            photo=open(WELCOME_IMAGE_PATH, 'rb'),
+            caption=WELCOME_MESSAGE,
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send local image, falling back to URL: {e}")
+        await update.message.reply_photo(
+            photo=WELCOME_IMAGE_URL,
+            caption=WELCOME_MESSAGE,
+            reply_markup=reply_markup
+        )
+
 
 # Claim points function
 async def claim_points(update: Update, context):
@@ -103,6 +122,7 @@ async def claim_points(update: Update, context):
     new_balance = user_data.get("points", 0) + points
     await query.message.reply_text(f"🎉 You received {points} points! Your balance is now {new_balance}.")
 
+
 # Balance command
 async def balance(update: Update, context):
     user_id = update.effective_user.id
@@ -110,22 +130,26 @@ async def balance(update: Update, context):
     points = user_data.get("points", 0)
     await update.message.reply_text(f"💰 Your current balance is {points} points.")
 
+
 # Initialize Telegram bot
 application = Application.builder().token(TOKEN).build()
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("balance", balance))
 application.add_handler(CallbackQueryHandler(claim_points, pattern="^claim_points$"))
 
+
 # Run Flask in a separate thread
 def run_flask():
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
+
 # Run Telegram bot using existing event loop
 async def run_telegram():
-    logging.info("📡 Starting Telegram bot in polling mode...")  # ✅ FIXED
+    logging.info("📡 Starting Telegram bot in polling mode...")
     await application.run_polling()
+
 
 # Start both Flask and Telegram bot
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
-    asyncio.run(run_telegram())  # Works properly with `nest_asyncio`
+    asyncio.run(run_telegram())
