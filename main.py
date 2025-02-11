@@ -175,22 +175,15 @@ application.add_handler(CallbackQueryHandler(claim_points, pattern="^claim_point
 application.add_handler(CallbackQueryHandler(referral, pattern="^referral$"))
 application.add_error_handler(error_handler)
 
-import asyncio
-
-def run_bot():
-    logger.info("Starting Telegram bot polling...")
-
-    loop = asyncio.new_event_loop()  # Create a new event loop
-    asyncio.set_event_loop(loop)
-
-    # Run the bot polling in a separate coroutine
-    loop.run_until_complete(application.run_polling(allowed_updates=Update.ALL_TYPES))
-
-
-# Run the bot in a separate thread
-bot_thread = threading.Thread(target=run_bot, daemon=True)
-bot_thread.start()
-
-# Run Flask app
-if __name__ == "__main__":
+def run_flask():
+    """Run Flask in a separate thread."""
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+if __name__ == "__main__":
+    # Start Flask in a separate thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+
+    # Run the Telegram bot in the main thread
+    logger.info("Starting Telegram bot polling...")
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
