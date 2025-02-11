@@ -7,7 +7,7 @@ import threading
 from datetime import datetime, timedelta
 from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackContext, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
@@ -22,9 +22,11 @@ logger = logging.getLogger(__name__)
 # Flask app
 app = Flask(__name__)
 
+
 @app.route('/')
 def home():
-    return "Telegram Bot with Flask is Running!"
+    return "🚀 Telegram Bot with Flask is Running!"
+
 
 # Load environment variables
 load_dotenv()
@@ -36,35 +38,32 @@ client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
 user_collection = db["users"]
 
-# Social Media Links
-TELEGRAM_CHANNEL_LINK = "https://t.me/YourChannel"
-TWITTER_LINK = "https://twitter.com/YourTwitter"
-YOUTUBE_LINK = "https://youtube.com/YourYouTube"
-
 # Constants
+REFERRAL_POINTS = 20  # Points awarded to the referrer
 WELCOME_MESSAGE = (
-    "\U0001F44B Welcome to Alien Enigma Bot!\n\n"
-    "Earn points by joining the Daily Lucky Draw, Fighting Aliens and inviting friends.\n\n"
-    "\U0001F50D What are these points for?\n"
+    "👋 Welcome to Alien Enigma Bot!\n\n"
+    "Earn points by joining the Daily Lucky Draw, Fighting Aliens, and inviting friends.\n\n"
+    "🔍 What are these points for?\n"
     "- Stay tuned to find out!\n"
-    "Pro Tip: Fight Aliens to earn more points\n"
+    "🚀 Pro Tip: Fight Aliens to earn more points\n"
     "Click the button below to claim your daily points!"
 )
-REFERRAL_POINTS = 20
+
 
 # Format time into 'Hh Mm' format
 def format_time(seconds):
     remaining_time = timedelta(seconds=int(seconds))
     return f"{remaining_time.seconds // 3600}h {remaining_time.seconds % 3600 // 60}m"
 
+
 # Start command
-async def start(update: Update, context: CallbackContext):
+async def start(update: Update, context):
     user_id = update.effective_user.id
     logger.info(f"User {user_id} started the bot")
 
     referred_by = context.args[0] if context.args else None
-
     user_data = user_collection.find_one({"user_id": user_id})
+
     if not user_data:
         user_collection.insert_one({"user_id": user_id, "points": 0, "last_claim": None, "referred_by": None})
 
@@ -77,23 +76,19 @@ async def start(update: Update, context: CallbackContext):
 
             await context.bot.send_message(
                 chat_id=referred_by,
-                text=f"\U0001F389 You earned {REFERRAL_POINTS} points for referring {update.effective_user.first_name}!"
+                text=f"🎉 You earned {REFERRAL_POINTS} points for referring {update.effective_user.first_name}!"
             )
 
     keyboard = [
-        [InlineKeyboardButton("\U0001F381 Claim Daily Points", callback_data="claim_points")],
-        [
-            InlineKeyboardButton("\U0001F4E2 Telegram", url=TELEGRAM_CHANNEL_LINK),
-            InlineKeyboardButton("\U0001F426 Twitter", url=TWITTER_LINK),
-            InlineKeyboardButton("▶️ YouTube", url=YOUTUBE_LINK),
-        ],
+        [InlineKeyboardButton("🎁 Claim Daily Points", callback_data="claim_points")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(WELCOME_MESSAGE, reply_markup=reply_markup)
 
+
 # Claim points function
-async def claim_points(update: Update, context: CallbackContext):
+async def claim_points(update: Update, context):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -104,22 +99,23 @@ async def claim_points(update: Update, context: CallbackContext):
 
     if last_claim_time and (current_time - last_claim_time).total_seconds() < 86400:
         await query.message.reply_text(
-            f"⏳ You've already claimed! Wait {format_time(86400 - (current_time - last_claim_time).total_seconds())}."
-        )
+            f"⏳ You've already claimed! Wait {format_time(86400 - (current_time - last_claim_time).total_seconds())}.")
         return
 
     points = random.randint(10, 100)
     user_collection.update_one({"user_id": user_id}, {"$inc": {"points": points}, "$set": {"last_claim": current_time}})
-    await query.message.reply_text(
-        f"🎉 You received {points} points! Your balance is now {user_data['points'] + points}."
-    )
+
+    new_balance = user_data.get("points", 0) + points
+    await query.message.reply_text(f"🎉 You received {points} points! Your balance is now {new_balance}.")
+
 
 # Balance command
-async def balance(update: Update, context: CallbackContext):
+async def balance(update: Update, context):
     user_id = update.effective_user.id
     user_data = user_collection.find_one({"user_id": user_id})
     points = user_data.get("points", 0)
     await update.message.reply_text(f"💰 Your current balance is {points} points.")
+
 
 # Initialize Telegram bot
 application = Application.builder().token(TOKEN).build()
@@ -127,15 +123,19 @@ application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("balance", balance))
 application.add_handler(CallbackQueryHandler(claim_points, pattern="^claim_points$"))
 
-# Function to run polling in a separate thread
-def run_telegram_bot():
-    print("📡 Starting Telegram bot in polling mode...")
-    application.run_polling()
 
-if __name__ == "__main__":
-    # Start Telegram bot in a separate thread
-    bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)
-    bot_thread.start()
-
-    # Start Flask server
+# Run Flask in a separate thread
+def run_flask():
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+
+# Run Telegram bot in polling mode
+async def run_telegram():
+    print("📡 Starting Telegram bot in polling mode...")
+    await application.run_polling()
+
+
+# Start both Flask and Telegram bot
+if __name__ == "__main__":
+    threading.Thread(target=run_flask, daemon=True).start()
+    asyncio.run(run_telegram())  # ✅ Fixed asyncio issue
