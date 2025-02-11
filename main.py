@@ -129,7 +129,7 @@ def run_flask():
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 
-# Run Telegram bot in polling mode
+# Run Telegram bot using existing event loop
 async def run_telegram():
     print("📡 Starting Telegram bot in polling mode...")
     await application.run_polling()
@@ -138,4 +138,6 @@ async def run_telegram():
 # Start both Flask and Telegram bot
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
-    asyncio.run(run_telegram())  # ✅ Fixed asyncio issue
+
+    loop = asyncio.get_event_loop()  # ✅ FIXED: Get the existing event loop
+    loop.run_until_complete(run_telegram())  # Run Telegram bot inside the existing event loop
