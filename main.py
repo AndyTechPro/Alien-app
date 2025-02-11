@@ -24,7 +24,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "\ud83d\ude80 Telegram Bot with Flask is Running!"
+    return "Telegram Bot with Flask is Running!".encode("utf-8")  # ✅ FIXED ENCODING ISSUE
 
 # Load environment variables
 load_dotenv()
@@ -39,11 +39,11 @@ user_collection = db["users"]
 # Constants
 REFERRAL_POINTS = 20  # Points awarded to the referrer
 WELCOME_MESSAGE = (
-    "\ud83d\udc4b Welcome to Alien Enigma Bot!\n\n"
+    "👋 Welcome to Alien Enigma Bot!\n\n"
     "Earn points by joining the Daily Lucky Draw, Fighting Aliens, and inviting friends.\n\n"
-    "\ud83d\udd0d What are these points for?\n"
+    "🔍 What are these points for?\n"
     "- Stay tuned to find out!\n"
-    "\ud83d\ude80 Pro Tip: Fight Aliens to earn more points\n"
+    "🚀 Pro Tip: Fight Aliens to earn more points\n"
     "Click the button below to claim your daily points!"
 )
 
@@ -72,10 +72,10 @@ async def start(update: Update, context):
 
             await context.bot.send_message(
                 chat_id=referred_by,
-                text=f"\ud83c\udf89 You earned {REFERRAL_POINTS} points for referring {update.effective_user.first_name}!"
+                text=f"🎉 You earned {REFERRAL_POINTS} points for referring {update.effective_user.first_name}!"
             )
 
-    keyboard = [[InlineKeyboardButton("\ud83c\udf81 Claim Daily Points", callback_data="claim_points")]]
+    keyboard = [[InlineKeyboardButton("🎁 Claim Daily Points", callback_data="claim_points")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(WELCOME_MESSAGE, reply_markup=reply_markup)
@@ -92,21 +92,21 @@ async def claim_points(update: Update, context):
 
     if last_claim_time and (current_time - last_claim_time).total_seconds() < 86400:
         await query.message.reply_text(
-            f"\u23f3 You've already claimed! Wait {format_time(86400 - (current_time - last_claim_time).total_seconds())}."
+            f"⏳ You've already claimed! Wait {format_time(86400 - (current_time - last_claim_time).total_seconds())}."
         )
         return
 
     points = random.randint(10, 100)
     user_collection.update_one({"user_id": user_id}, {"$inc": {"points": points}, "$set": {"last_claim": current_time}})
     new_balance = user_data.get("points", 0) + points
-    await query.message.reply_text(f"\ud83c\udf89 You received {points} points! Your balance is now {new_balance}.")
+    await query.message.reply_text(f"🎉 You received {points} points! Your balance is now {new_balance}.")
 
 # Balance command
 async def balance(update: Update, context):
     user_id = update.effective_user.id
     user_data = user_collection.find_one({"user_id": user_id})
     points = user_data.get("points", 0)
-    await update.message.reply_text(f"\ud83d\udcb0 Your current balance is {points} points.")
+    await update.message.reply_text(f"💰 Your current balance is {points} points.")
 
 # Initialize Telegram bot
 application = Application.builder().token(TOKEN).build()
@@ -120,12 +120,11 @@ def run_flask():
 
 # Run Telegram bot using existing event loop
 async def run_telegram():
-    print("\ud83d\udcf1 Starting Telegram bot in polling mode...")
+    logging.info("📡 Starting Telegram bot in polling mode...")  # ✅ FIXED
     await application.run_polling()
 
 # Start both Flask and Telegram bot
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
     loop = asyncio.get_event_loop()
-    loop.create_task(run_telegram())
-    loop.run_forever()
+    loop.run_until_complete(run_telegram())
