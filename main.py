@@ -31,7 +31,6 @@ def home():
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Set your deployed domain
 
 # Connect to MongoDB
 client = MongoClient(MONGO_URI)
@@ -44,19 +43,18 @@ TWITTER_LINK = "https://twitter.com/YourTwitter"
 YOUTUBE_LINK = "https://youtube.com/YourYouTube"
 
 # Constants
-WELCOME_IMAGE_PATH = "preview.jpg"
 WELCOME_MESSAGE = (
-    "\U0001F44B Welcome to Alien Enigma Bot!\n\n"
-    "Earn points by joining the Daily Lucky Draw, Fighting Aliens and inviting friends.\n\n"
+    "👋 Welcome to Alien Enigma Bot!\n\n"
+    "Earn points by joining the Daily Lucky Draw, Fighting Aliens, and inviting friends.\n\n"
     "🔍 What are these points for?\n"
     "- Stay tuned to find out!\n"
     "Pro Tip: Fight Aliens to earn more points\n"
     "Click the button below to claim your daily points!"
 )
-REFERRAL_POINTS = 20  # Points awarded to the referrer
+REFERRAL_POINTS = 20  # Points for referrals
 
 
-# Format time into 'Hh Mm' format
+# Format time function
 def format_time(seconds):
     remaining_time = timedelta(seconds=int(seconds))
     return f"{remaining_time.seconds // 3600}h {remaining_time.seconds % 3600 // 60}m"
@@ -68,8 +66,8 @@ async def start(update: Update, context: CallbackContext):
     logger.info(f"User {user_id} started the bot")
 
     referred_by = context.args[0] if context.args else None
-
     user_data = user_collection.find_one({"user_id": user_id})
+
     if not user_data:
         user_collection.insert_one({"user_id": user_id, "points": 0, "last_claim": None, "referred_by": None})
 
@@ -79,7 +77,6 @@ async def start(update: Update, context: CallbackContext):
         if referrer_data:
             user_collection.update_one({"user_id": referred_by}, {"$inc": {"points": REFERRAL_POINTS}})
             user_collection.update_one({"user_id": user_id}, {"$set": {"referred_by": referred_by}})
-
             await context.bot.send_message(
                 chat_id=referred_by,
                 text=f"🎉 You earned {REFERRAL_POINTS} points for referring {update.effective_user.first_name}!"
@@ -94,7 +91,6 @@ async def start(update: Update, context: CallbackContext):
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(WELCOME_MESSAGE, reply_markup=reply_markup)
 
 
@@ -127,18 +123,6 @@ async def balance(update: Update, context: CallbackContext):
     await update.message.reply_text(f"💰 Your current balance is {points} points.")
 
 
-# Telegram Webhook
-async def set_webhook():
-    await application.bot.set_webhook(url=f"{WEBHOOK_URL}/telegram")
-
-
-@app.route("/telegram", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(), application.bot)
-    application.update_queue.put_nowait(update)
-    return "OK", 200
-
-
 # Initialize Telegram bot
 application = Application.builder().token(TOKEN).build()
 application.add_handler(CommandHandler("start", start))
@@ -146,12 +130,24 @@ application.add_handler(CommandHandler("balance", balance))
 application.add_handler(CallbackQueryHandler(claim_points, pattern="^claim_points$"))
 
 
-async def startup():
-    await set_webhook()
+# Function to start polling (instead of webhook)
+async def start_polling():
+    print("📡 Starting Telegram bot in polling mode...")
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
 
-
-asyncio.run(startup())
 
 # Run Flask app
-if __name__ == "__main__":
+def run_flask():
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+
+# Run both Flask and Telegram bot
+if __name__ == "__main__":
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Start Telegram bot (polling) and Flask together
+    loop.create_task(start_polling())
+    run_flask()
