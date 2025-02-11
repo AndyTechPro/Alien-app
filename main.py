@@ -175,10 +175,13 @@ application.add_handler(CallbackQueryHandler(claim_points, pattern="^claim_point
 application.add_handler(CallbackQueryHandler(referral, pattern="^referral$"))
 application.add_error_handler(error_handler)
 
+import asyncio
+
 # Function to run the bot
 def run_bot():
     logger.info("Starting Telegram bot polling...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    asyncio.run(application.run_polling(allowed_updates=Update.ALL_TYPES))
+
 
 # Run the bot in a separate thread
 bot_thread = threading.Thread(target=run_bot, daemon=True)
