@@ -25,11 +25,9 @@ logger = logging.getLogger(__name__)
 # Flask app
 app = Flask(__name__)
 
-
 @app.route('/')
 def home():
     return "Telegram Bot with Flask is Running!".encode("utf-8")
-
 
 # Load environment variables
 load_dotenv()
@@ -54,12 +52,10 @@ WELCOME_MESSAGE = (
     "Click the button below to claim your daily points!"
 )
 
-
 # Format time into 'Hh Mm' format
 def format_time(seconds):
     remaining_time = timedelta(seconds=int(seconds))
     return f"{remaining_time.seconds // 3600}h {remaining_time.seconds % 3600 // 60}m"
-
 
 # Start command
 async def start(update: Update, context):
@@ -70,13 +66,13 @@ async def start(update: Update, context):
     user_data = user_collection.find_one({"user_id": user_id})
 
     if not user_data:
-        user_collection.insert_one({"user_id": user_id, "points": 0, "last_claim": None, "referred_by": None})
+        user_collection.insert_one({"user_id": user_id, "bot_points": 0, "game_points": 0, "last_claim": None, "referred_by": None})
 
     if referred_by and referred_by != str(user_id):
         referred_by = int(referred_by)
         referrer_data = user_collection.find_one({"user_id": referred_by})
         if referrer_data:
-            user_collection.update_one({"user_id": referred_by}, {"$inc": {"points": REFERRAL_POINTS}})
+            user_collection.update_one({"user_id": referred_by}, {"$inc": {"bot_points": REFERRAL_POINTS}})
             user_collection.update_one({"user_id": user_id}, {"$set": {"referred_by": referred_by}})
             await context.bot.send_message(
                 chat_id=referred_by,
@@ -100,7 +96,6 @@ async def start(update: Update, context):
             reply_markup=reply_markup
         )
 
-
 # Claim points function
 async def claim_points(update: Update, context):
     query = update.callback_query
@@ -118,18 +113,22 @@ async def claim_points(update: Update, context):
         return
 
     points = random.randint(10, 100)
-    user_collection.update_one({"user_id": user_id}, {"$inc": {"points": points}, "$set": {"last_claim": current_time}})
-    new_balance = user_data.get("points", 0) + points
+    user_collection.update_one(
+        {"user_id": user_id},
+        {"$inc": {"bot_points": points}, "$set": {"last_claim": current_time}},
+        upsert=True
+    )
+    new_balance = user_data.get("bot_points", 0) + points
     await query.message.reply_text(f"🎉 You received {points} points! Your balance is now {new_balance}.")
-
 
 # Balance command
 async def balance(update: Update, context):
     user_id = update.effective_user.id
     user_data = user_collection.find_one({"user_id": user_id})
-    points = user_data.get("points", 0)
-    await update.message.reply_text(f"💰 Your current balance is {points} points.")
-
+    bot_points = user_data.get("bot_points", 0)
+    game_points = user_data.get("game_points", 0)
+    total_balance = bot_points + game_points
+    await update.message.reply_text(f"💰 Your current balance is {total_balance} points.")
 
 # Initialize Telegram bot
 application = Application.builder().token(TOKEN).build()
@@ -137,17 +136,14 @@ application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("balance", balance))
 application.add_handler(CallbackQueryHandler(claim_points, pattern="^claim_points$"))
 
-
 # Run Flask in a separate thread
 def run_flask():
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
 
 # Run Telegram bot using existing event loop
 async def run_telegram():
     logging.info("📡 Starting Telegram bot in polling mode...")
     await application.run_polling()
-
 
 # Start both Flask and Telegram bot
 if __name__ == "__main__":
